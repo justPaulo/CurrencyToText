@@ -5,21 +5,21 @@
          "type": "swift",
          "request": "launch",
          "args": [],
-         "cwd": "${workspaceFolder:CurrencyToWords}",
-         "name": "Debug CurrencyToWords",
-         "target": "CurrencyToWords",
+         "cwd": "${workspaceFolder:CurrencyToText}",
+         "name": "Debug CurrencyToText",
+         "target": "CurrencyToText",
          "configuration": "debug",
-         "preLaunchTask": "swift: Build Debug CurrencyToWords"
+         "preLaunchTask": "swift: Build Debug CurrencyToText"
       },
       {
          "type": "swift",
          "request": "launch",
          "args": [],
-         "cwd": "${workspaceFolder:CurrencyToWords}",
-         "name": "Release CurrencyToWords",
-         "target": "CurrencyToWords",
+         "cwd": "${workspaceFolder:CurrencyToText}",
+         "name": "Release CurrencyToText",
+         "target": "CurrencyToText",
          "configuration": "release",
-         "preLaunchTask": "swift: Build Release CurrencyToWords"
+         "preLaunchTask": "swift: Build Release CurrencyToText"
       }
    ]
 }

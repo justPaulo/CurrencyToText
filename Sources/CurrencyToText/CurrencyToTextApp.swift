@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct CurrencyToWordsApp: App {
+struct CurrencyToTextApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

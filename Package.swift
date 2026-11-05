@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "CurrencyToWords",
+    name: "CurrencyToText",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "CurrencyToWords", targets: ["CurrencyToWords"])
+        .executable(name: "CurrencyToText", targets: ["CurrencyToText"])
     ],
     targets: [
-        .executableTarget(name: "CurrencyToWords")
+        .executableTarget(name: "CurrencyToText")
     ]
 )
