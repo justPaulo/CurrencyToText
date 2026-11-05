@@ -4,6 +4,12 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case portuguese
     case english
     case spanish
+    case german
+    case japanese
+    case russian
+    case french
+    case korean
+    case chineseSimplified
 
     var id: String { rawValue }
 
@@ -12,15 +18,110 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .portuguese: "Português"
         case .english: "English"
         case .spanish: "Español"
+        case .german: "Deutsch"
+        case .japanese: "日本語"
+        case .russian: "Русский"
+        case .french: "Français"
+        case .korean: "한국어"
+        case .chineseSimplified: "简体中文"
         }
     }
 
     var amountPlaceholder: String {
         switch self {
-        case .portuguese: "Ex.: 123,45"
-        case .english: "e.g. 123.45"
-        case .spanish: "Ej.: 123,45"
+        case .portuguese: "Ex.: 1.234,56"
+        case .english: "e.g. 1,234.56"
+        case .spanish: "Ej.: 1.234,56"
+        case .german: "z. B. 1.234,56"
+        case .japanese: "例: 1,234.56"
+        case .russian: "Напр.: 1 234,56"
+        case .french: "Ex. : 1 234,56"
+        case .korean: "예: 1,234.56"
+        case .chineseSimplified: "例：1,234.56"
         }
+    }
+
+    var decimalSeparator: Character {
+        switch self {
+        case .english, .japanese, .korean, .chineseSimplified: "."
+        case .portuguese, .spanish, .german, .russian, .french: ","
+        }
+    }
+
+    var groupingSeparator: Character {
+        switch self {
+        case .english, .japanese, .korean, .chineseSimplified: ","
+        case .portuguese, .spanish, .german: "."
+        case .russian, .french: " "
+        }
+    }
+
+    func formattedAmountInput(_ input: String) -> String {
+        guard !input.isEmpty else { return input }
+        let sign = input.first == "-" || input.first == "+" ? String(input.prefix(1)) : ""
+        let unsigned = sign.isEmpty ? input : String(input.dropFirst())
+        let parts = unsigned.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count <= 2,
+              parts.allSatisfy({ $0.allSatisfy { $0 >= "0" && $0 <= "9" } })
+        else { return input }
+
+        let whole = String(parts[0])
+        let groupedCharacters = whole.reversed().enumerated().reduce(into: [Character]()) { result, item in
+            if item.offset > 0 && item.offset.isMultiple(of: 3) {
+                result.append(groupingSeparator)
+            }
+            result.append(item.element)
+        }.reversed()
+        var formatted = sign + String(groupedCharacters)
+        if parts.count == 2 {
+            formatted.append(decimalSeparator)
+            formatted.append(contentsOf: parts[1])
+        }
+        return formatted
+    }
+
+    func normalizedAmountInput(_ input: String, allowAlternateDecimal: Bool = true) -> String {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return trimmed }
+
+        let sign = trimmed.first == "-" || trimmed.first == "+" ? String(trimmed.prefix(1)) : ""
+        let unsigned = sign.isEmpty ? trimmed : String(trimmed.dropFirst())
+        let decimalParts = unsigned.split(separator: decimalSeparator, omittingEmptySubsequences: false)
+        if decimalParts.count == 2 {
+            let whole = String(decimalParts[0])
+            guard whole.split(separator: groupingSeparator, omittingEmptySubsequences: false)
+                .allSatisfy({ $0.allSatisfy { $0 >= "0" && $0 <= "9" } })
+            else { return trimmed }
+            return sign + whole.replacingOccurrences(of: String(groupingSeparator), with: "")
+                + "." + decimalParts[1]
+        }
+        guard decimalParts.count == 1 else { return trimmed }
+
+        let groupingParts = unsigned.split(separator: groupingSeparator, omittingEmptySubsequences: false)
+        if groupingParts.count > 1 {
+            if isValidGroupedInteger(unsigned) {
+                return sign + unsigned.replacingOccurrences(of: String(groupingSeparator), with: "")
+            }
+            if allowAlternateDecimal,
+               groupingParts.count == 2,
+               groupingParts[1].count <= 2,
+               groupingParts.allSatisfy({ $0.allSatisfy { $0 >= "0" && $0 <= "9" } }) {
+                return sign + groupingParts[0] + "." + groupingParts[1]
+            }
+            if groupingParts.allSatisfy({ $0.allSatisfy { $0 >= "0" && $0 <= "9" } }) {
+                return sign + unsigned.replacingOccurrences(of: String(groupingSeparator), with: "")
+            }
+            return trimmed
+        }
+        return trimmed
+    }
+
+    private func isValidGroupedInteger(_ input: String) -> Bool {
+        let groups = input.split(separator: groupingSeparator, omittingEmptySubsequences: false)
+        guard groups.allSatisfy({ $0.allSatisfy { $0 >= "0" && $0 <= "9" } }) else { return false }
+        guard groups.count > 1 else { return true }
+        return (1...3).contains(groups[0].count)
+            && groups.dropFirst().allSatisfy { $0.count == 3 }
     }
 }
 
@@ -41,12 +142,24 @@ enum Currency: String, CaseIterable, Identifiable {
         }
     }
 
-    var majorGender: GrammaticalGender {
-        self == .gbp ? .feminine : .masculine
+    func majorGender(for language: AppLanguage) -> GrammaticalGender {
+        switch language {
+        case .portuguese, .spanish, .french:
+            return self == .gbp ? .feminine : .masculine
+        case .german:
+            return .masculine
+        case .russian:
+            return self == .eur ? .neuter : .masculine
+        case .english, .japanese, .korean, .chineseSimplified:
+            return .masculine
+        }
     }
 
     func majorName(_ language: AppLanguage, plural: Bool) -> String {
-        switch (self, language, plural) {
+        if language == .russian {
+            return russianMajorName(number: plural ? 2 : 1)
+        }
+        return switch (self, language, plural) {
         case (.eur, .portuguese, false): "euro"
         case (.eur, .portuguese, true): "euros"
         case (.eur, .english, false): "euro"
@@ -71,11 +184,46 @@ enum Currency: String, CaseIterable, Identifiable {
         case (.brl, .english, true): "Brazilian reals"
         case (.brl, .spanish, false): "real brasileño"
         case (.brl, .spanish, true): "reales brasileños"
+        case (.eur, .german, false): "Euro"
+        case (.eur, .german, true): "Euro"
+        case (.usd, .german, false): "US-Dollar"
+        case (.usd, .german, true): "US-Dollar"
+        case (.gbp, .german, false): "Pfund Sterling"
+        case (.gbp, .german, true): "Pfund Sterling"
+        case (.brl, .german, false): "brasilianischer Real"
+        case (.brl, .german, true): "brasilianische Reals"
+        case (.eur, .japanese, _): "ユーロ"
+        case (.usd, .japanese, _): "米ドル"
+        case (.gbp, .japanese, _): "英ポンド"
+        case (.brl, .japanese, _): "ブラジルレアル"
+        case (.eur, .russian, _): "евро"
+        case (.usd, .russian, _): "доллар"
+        case (.gbp, .russian, _): "фунт стерлингов"
+        case (.brl, .russian, _): "бразильский реал"
+        case (.eur, .french, false): "euro"
+        case (.eur, .french, true): "euros"
+        case (.usd, .french, false): "dollar américain"
+        case (.usd, .french, true): "dollars américains"
+        case (.gbp, .french, false): "livre sterling"
+        case (.gbp, .french, true): "livres sterling"
+        case (.brl, .french, false): "réal brésilien"
+        case (.brl, .french, true): "réaux brésiliens"
+        case (.eur, .korean, _): "유로"
+        case (.usd, .korean, _): "미국 달러"
+        case (.gbp, .korean, _): "영국 파운드"
+        case (.brl, .korean, _): "브라질 레알"
+        case (.eur, .chineseSimplified, _): "欧元"
+        case (.usd, .chineseSimplified, _): "美元"
+        case (.gbp, .chineseSimplified, _): "英镑"
+        case (.brl, .chineseSimplified, _): "巴西雷亚尔"
         }
     }
 
     func minorName(_ language: AppLanguage, plural: Bool) -> String {
-        switch (self, language, plural) {
+        if language == .russian {
+            return russianMinorName(number: plural ? 2 : 1)
+        }
+        return switch (self, language, plural) {
         case (.eur, .portuguese, false): "cêntimo"
         case (.eur, .portuguese, true): "cêntimos"
         case (.eur, .english, false): "cent"
@@ -94,6 +242,59 @@ enum Currency: String, CaseIterable, Identifiable {
         case (.gbp, .english, true): "pence"
         case (.gbp, .spanish, false): "penique"
         case (.gbp, .spanish, true): "peniques"
+        case (.eur, .german, _): "Cent"
+        case (.usd, .german, _), (.brl, .german, _): "Cent"
+        case (.gbp, .german, false): "Penny"
+        case (.gbp, .german, true): "Pence"
+        case (.eur, .japanese, _): "セント"
+        case (.usd, .japanese, _), (.brl, .japanese, _): "セント"
+        case (.gbp, .japanese, _): "ペンス"
+        case (.eur, .russian, _): "евроцент"
+        case (.usd, .russian, _): "цент"
+        case (.gbp, .russian, _): "пенс"
+        case (.brl, .russian, _): "сентаво"
+        case (.eur, .french, false): "centime"
+        case (.eur, .french, true): "centimes"
+        case (.usd, .french, false), (.brl, .french, false): "centime"
+        case (.usd, .french, true), (.brl, .french, true): "centimes"
+        case (.gbp, .french, false): "penny"
+        case (.gbp, .french, true): "pence"
+        case (.eur, .korean, _): "센트"
+        case (.usd, .korean, _), (.brl, .korean, _): "센트"
+        case (.gbp, .korean, _): "펜스"
+        case (.eur, .chineseSimplified, _): "欧分"
+        case (.usd, .chineseSimplified, _), (.brl, .chineseSimplified, _): "美分"
+        case (.gbp, .chineseSimplified, _): "便士"
+        }
+    }
+
+    func russianMajorName(number: Int) -> String {
+        let form = russianForm(number)
+        return switch self {
+        case .eur: "евро"
+        case .usd: form == 1 ? "доллар" : form == 2 ? "доллара" : "долларов"
+        case .gbp: form == 1 ? "фунт стерлингов" : form == 2 ? "фунта стерлингов" : "фунтов стерлингов"
+        case .brl: form == 1 ? "реал" : form == 2 ? "реала" : "реалов"
+        }
+    }
+
+    func russianMinorName(number: Int) -> String {
+        let form = russianForm(number)
+        return switch self {
+        case .eur: form == 1 ? "евроцент" : form == 2 ? "евроцента" : "евроцентов"
+        case .usd: form == 1 ? "цент" : form == 2 ? "цента" : "центов"
+        case .gbp: form == 1 ? "пенс" : form == 2 ? "пенса" : "пенсов"
+        case .brl: form == 1 ? "сентаво" : form == 2 ? "сентаво" : "сентаво"
+        }
+    }
+
+    private func russianForm(_ number: Int) -> Int {
+        let lastTwo = number % 100
+        if (11...14).contains(lastTwo) { return 3 }
+        return switch number % 10 {
+        case 1: 1
+        case 2...4: 2
+        default: 3
         }
     }
 }
@@ -101,6 +302,7 @@ enum Currency: String, CaseIterable, Identifiable {
 enum GrammaticalGender {
     case masculine
     case feminine
+    case neuter
 }
 
 struct MoneyAmount {
@@ -140,12 +342,18 @@ struct MoneyAmount {
     }
 
     func words(currency: Currency, language: AppLanguage) -> String {
-        let majorWords = NumberWords.spell(major, language: language, gender: currency.majorGender)
+        let majorWords = NumberWords.spell(major, language: language, gender: currency.majorGender(for: language))
         let minorWords = NumberWords.spell(Int64(minor), language: language, gender: .masculine)
 
-        var result = "\(majorWords) \(currency.majorName(language, plural: major != 1))"
+        let majorCurrencyName = language == .russian
+            ? currency.russianMajorName(number: Int(major % 100))
+            : currency.majorName(language, plural: major != 1)
+        var result = "\(majorWords)\(language.wordSeparator)\(majorCurrencyName)"
         if minor > 0 {
-            result += "\(language.conjunction)\(minorWords) \(currency.minorName(language, plural: minor != 1))"
+            let minorCurrencyName = language == .russian
+                ? currency.russianMinorName(number: minor)
+                : currency.minorName(language, plural: minor != 1)
+            result += "\(language.conjunction)\(minorWords)\(language.wordSeparator)\(minorCurrencyName)"
         }
         if isNegative && (major != 0 || minor != 0) {
             result = "\(language.negativePrefix)\(result)"
@@ -160,6 +368,18 @@ private extension AppLanguage {
         case .portuguese: " e "
         case .english: " and "
         case .spanish: " y "
+        case .german: " und "
+        case .japanese, .chineseSimplified: ""
+        case .russian: " и "
+        case .french: " et "
+        case .korean: " 그리고 "
+        }
+    }
+
+    var wordSeparator: String {
+        switch self {
+        case .japanese, .chineseSimplified: ""
+        default: " "
         }
     }
 
@@ -168,6 +388,12 @@ private extension AppLanguage {
         case .portuguese: "menos "
         case .english: "minus "
         case .spanish: "menos "
+        case .german: "minus "
+        case .japanese: "マイナス"
+        case .russian: "минус "
+        case .french: "moins "
+        case .korean: "마이너스 "
+        case .chineseSimplified: "负"
         }
     }
 }
