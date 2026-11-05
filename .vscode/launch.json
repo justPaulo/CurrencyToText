@@ -1,0 +1,25 @@
+{
+   "configurations": [
+      {},
+      {
+         "type": "swift",
+         "request": "launch",
+         "args": [],
+         "cwd": "${workspaceFolder:CurrencyToWords}",
+         "name": "Debug CurrencyToWords",
+         "target": "CurrencyToWords",
+         "configuration": "debug",
+         "preLaunchTask": "swift: Build Debug CurrencyToWords"
+      },
+      {
+         "type": "swift",
+         "request": "launch",
+         "args": [],
+         "cwd": "${workspaceFolder:CurrencyToWords}",
+         "name": "Release CurrencyToWords",
+         "target": "CurrencyToWords",
+         "configuration": "release",
+         "preLaunchTask": "swift: Build Release CurrencyToWords"
+      }
+   ]
+}
